@@ -1,5 +1,8 @@
-import React, { StrictMode, useState } from "react";
+import React, { StrictMode, useEffect, useState } from "react";
 import ReactDom from "react-dom/client";
+import { getALLRecords } from "./utils/supabaseFunction";
+import { addRecord } from "./utils/supabaseFunction";
+import { deleteRecord } from "./utils/supabaseFunction";
 
 const App = () => {
   const [recordText, setRecordText] = useState("");
@@ -15,25 +18,53 @@ const App = () => {
   const [records, setRecords] = useState([]);
   const [error, setError] = useState("");
   const [time, setTime] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const onClickAdd = () => {
-    if (recordText === "" || recordTime === 0) {
-      setError("入力されていない項目があります");
+  useEffect(() => {
+    const getRecords = async () => {
+      setIsLoading(true);
+      const data = await getALLRecords();
+      setRecords(data);
+      setIsLoading(false);
+    };
+    getRecords();
+  }, []);
+
+  const onClickAdd = async () => {
+    if (recordText === "") {
+      setError("学習内容を入力してください");
+      return;
+    }
+    if (recordTime <= 0) {
+      setError("学習時間は1以上を入力してください");
       return;
     }
     setError("");
-    const newRecord = { title: recordText, time: recordTime };
+
+    // setTime([...time, parseInt(recordTime, 10)]);
+
+    const newRecord = await addRecord(recordText, parseInt(recordTime, 10));
     setRecords([...records, newRecord]);
-    setTime([...time, parseInt(recordTime, 10)]);
+
     setRecordText("");
     setRecordTime(0);
   };
 
-  const totalTime = time.reduce((acc, cur) => acc + cur, 0);
+  const totalTime = time.reduce((acc, cur) => acc + cur.time, 0);
+
+  const onClickDelete = async (id) => {
+    await deleteRecord(id);
+    const newRecords = records.filter((record) => record.id !== id);
+    setRecords(newRecords);
+  };
+
+  if (isLoading) {
+    return <div>Loading</div>;
+  }
 
   return (
     <>
-      <h1>学習記録一覧</h1>
+      <h1>学習記録一覧アプリ</h1>
       <div>
         学習内容
         <input value={recordText} onChange={onChangeRecordText} />
@@ -45,12 +76,32 @@ const App = () => {
       <div>入力されている学習内容：{recordText}</div>
       <div>入力されている時間：{recordTime}</div>
       <div>
-        {records.map((record) => (
-          <div key={record.title}>
-            {record.title}&ensp;
-            {record.time}時間
-          </div>
-        ))}
+        <div>
+          {records.map((record) => (
+            <div
+              key={record.id}
+              style={{ display: "flex", gap: "10px", margin: "5px 0" }}
+            >
+              {record.title}&ensp;
+              {record.time}時間
+              <button
+                onClick={() => onClickDelete(record.id)}
+                style={{
+                  fontSize: "12px",
+                  border: "1px solid #000",
+                  padding: "0 2px",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                削除
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
       <button onClick={onClickAdd}>登録</button>
       {error && <div>{error}</div>}
